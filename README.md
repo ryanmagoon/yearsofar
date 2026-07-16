@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Steam Year So Far
 
-## Getting Started
+A live "year in review, so far" for a Steam account. Steam Replay only covers
+the _previous_ year — this app shows what you've played in the _current_
+calendar year, updated continuously from the Steam Web API.
 
-First, run the development server:
+## How it works
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- A daily [Vercel cron](https://vercel.com/docs/cron-jobs) hits
+  `/api/cron/snapshot`, which fetches your full library (with lifetime playtime
+  per game) from Steam and stores it as a dated snapshot in Postgres (Neon).
+- The dashboard fetches your library live from Steam on each visit and diffs it
+  against the **earliest snapshot of the current year** (the baseline).
+  The difference per game is "hours played this year."
+- If the baseline was taken after early January (e.g. you deployed the app in
+  July), the UI labels the numbers as partial-year tracking. Next January 1st
+  onward the baseline will naturally be a Jan 1 snapshot and the numbers become
+  true year-to-date.
+
+### Edge cases handled
+
+- **Games bought this year**: absent from the baseline → flagged "New this
+  year", full playtime counts as gained.
+- **Games first played this year**: owned at baseline with 0 minutes → flagged
+  "First played this year".
+- **Missing last-played dates**: shown as "No last-played record".
+- **Shrinking totals** (family sharing quirks): deltas are clamped to ≥ 0, and
+  snapshot re-runs keep the higher playtime per (day, game).
+- **Duplicate appids** in a snapshot: deduplicated, keeping the highest
+  playtime.
+
+## Database schema
+
+One table, created automatically on first write:
+
+```sql
+CREATE TABLE snapshots (
+  snapshot_date    date        NOT NULL,
+  appid            integer     NOT NULL,
+  name             text        NOT NULL,
+  playtime_minutes integer     NOT NULL,
+  last_played      timestamptz,
+  PRIMARY KEY (snapshot_date, appid)
+);
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable        | What it is                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------- |
+| `STEAM_API_KEY` | Steam Web API key from <https://steamcommunity.com/dev/apikey>                                    |
+| `STEAM_ID`      | Your 64-bit SteamID (e.g. from <https://steamid.io>)                                              |
+| `DATABASE_URL`  | Postgres connection string (the Neon integration on Vercel sets this automatically)               |
+| `CRON_SECRET`   | Any random string; Vercel sends it as a bearer token to the cron route so outsiders can't spam it |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Your Steam profile's **Game details** privacy setting must be **Public** for
+the API to return playtime.
 
-## Learn More
+## Local development
 
-To learn more about Next.js, take a look at the following resources:
+```sh
+pnpm install
+cp .env.example .env.local   # fill in the values
+pnpm dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Without env vars the app renders a setup notice instead of crashing.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```sh
+pnpm test        # vitest
+pnpm lint
+pnpm typecheck
+pnpm format
+```
 
-## Deploy on Vercel
+## Deploying
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Deploy the repo to [Vercel](https://vercel.com).
+2. Add the **Neon** integration (Storage → Create Database → Neon) — this sets
+   `DATABASE_URL`.
+3. Set `STEAM_API_KEY`, `STEAM_ID`, and `CRON_SECRET` in Project → Settings →
+   Environment Variables.
+4. Redeploy. The cron in `vercel.json` (daily at 06:17 UTC) starts taking
+   snapshots; the first page visit also takes an initial snapshot so the
+   baseline exists immediately.
