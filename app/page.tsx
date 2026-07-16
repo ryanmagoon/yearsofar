@@ -1,65 +1,129 @@
-import Image from 'next/image'
+import { GamesTable } from '@/components/games-table'
+import { ThemeToggle } from '@/components/theme-toggle'
+import { getYearSoFar } from '@/lib/data'
+import { formatDate, formatPlaytime } from '@/lib/format'
+import { toGameRowJson } from '@/lib/serialize'
 
-export default function Home() {
+// Depends on live Steam data + the database, so never prerender at build time.
+export const dynamic = 'force-dynamic'
+
+function SetupNotice({ message }: { message: string }) {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{' '}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main className="mx-auto flex min-h-screen w-full max-w-xl flex-col justify-center px-6 py-16">
+      <h1 className="font-display text-3xl">Steam Year So Far</h1>
+      <div className="mt-6 rounded-lg border border-line bg-surface p-5">
+        <p className="text-sm font-medium">Not ready yet</p>
+        <p className="mt-2 text-sm leading-relaxed text-muted">{message}</p>
+        <p className="mt-4 text-xs text-faint">
+          Set the environment variables described in the README, then reload.
+        </p>
+      </div>
+    </main>
+  )
+}
+
+export default async function Home() {
+  let data
+  try {
+    data = await getYearSoFar()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return <SetupNotice message={message} />
+  }
+
+  const { stats, year, baselineDate, baselineIsPartial } = data
+  const rows = stats.games.map(toGameRowJson)
+  const topGame = [...stats.games].sort(
+    (a, b) => b.minutesGained - a.minutesGained,
+  )[0]
+  const lastPlayedGame = [...stats.games]
+    .filter((g) => g.lastPlayed !== null)
+    .sort(
+      (a, b) => (b.lastPlayed?.getTime() ?? 0) - (a.lastPlayed?.getTime() ?? 0),
+    )[0]
+  const newToLibraryCount = stats.games.filter(
+    (g) => g.newToLibrary && g.playedThisYear,
+  ).length
+
+  const summary = [
+    { label: 'Games played', value: String(stats.gamesPlayedCount) },
+    { label: 'First played this year', value: String(stats.firstPlayedCount) },
+    { label: 'New to library & played', value: String(newToLibraryCount) },
+    {
+      label: 'Most played',
+      value: topGame && topGame.minutesGained > 0 ? topGame.name : '—',
+      detail:
+        topGame && topGame.minutesGained > 0
+          ? `+${formatPlaytime(topGame.minutesGained)}`
+          : undefined,
+    },
+    {
+      label: 'Last played',
+      value: lastPlayedGame?.name ?? '—',
+      detail: lastPlayedGame?.lastPlayed
+        ? formatDate(lastPlayedGame.lastPlayed.toISOString())
+        : undefined,
+    },
+  ]
+
+  return (
+    <main className="mx-auto w-full max-w-4xl px-5 py-10 sm:px-8 sm:py-14">
+      <header className="flex items-baseline justify-between">
+        <p className="text-xs uppercase tracking-[0.2em] text-muted">
+          Steam · Year So Far
+        </p>
+        <ThemeToggle />
+      </header>
+
+      <section className="mt-12 sm:mt-16">
+        <h1 className="font-display text-[clamp(3.5rem,12vw,7rem)] leading-none tracking-tight">
+          {year}
+        </h1>
+        <p className="mt-6 font-display text-4xl text-accent sm:text-5xl">
+          {formatPlaytime(stats.totalMinutesGained)}
+          <span className="ml-3 font-sans text-base text-muted">
+            played this year
+          </span>
+        </p>
+        <p className="mt-3 text-sm text-muted">
+          Measured against a snapshot from {formatDate(baselineDate)}.
+          {baselineIsPartial && (
+            <span className="text-foreground">
+              {' '}
+              Tracking started mid-year, so earlier {year} playtime isn&apos;t
+              counted.
+            </span>
+          )}
+        </p>
+      </section>
+
+      <section className="mt-12 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-5">
+        {summary.map((item) => (
+          <div key={item.label} className="bg-surface p-4">
+            <p className="text-xs text-muted">{item.label}</p>
+            <p
+              className="mt-2 truncate font-display text-xl"
+              title={item.value}
             >
-              Templates
-            </a>{' '}
-            or the{' '}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{' '}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+              {item.value}
+            </p>
+            {item.detail && (
+              <p className="mt-0.5 font-mono text-xs text-accent">
+                {item.detail}
+              </p>
+            )}
+          </div>
+        ))}
+      </section>
+
+      <div className="mt-14">
+        <GamesTable games={rows} />
+      </div>
+
+      <footer className="mt-16 border-t border-line pt-5 text-xs text-faint">
+        Playtime totals come from the Steam Web API. Yearly gains are measured
+        against daily snapshots taken by this site.
+      </footer>
+    </main>
   )
 }
