@@ -1,9 +1,11 @@
+import Image from 'next/image'
 import { GamesTable } from '@/components/games-table'
 import { SummaryCards, type SummaryItem } from '@/components/summary-cards'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { getYearSoFar } from '@/lib/data'
 import { formatDate, formatPlaytime } from '@/lib/format'
 import { toGameRowJson } from '@/lib/serialize'
+import { getPlayerSummary } from '@/lib/steam'
 
 // Depends on live Steam data + the database, so never prerender at build time.
 export const dynamic = 'force-dynamic'
@@ -25,8 +27,9 @@ function SetupNotice({ message }: { message: string }) {
 
 export default async function Home() {
   let data
+  let player
   try {
-    data = await getYearSoFar()
+    ;[data, player] = await Promise.all([getYearSoFar(), getPlayerSummary()])
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     return <SetupNotice message={message} />
@@ -89,15 +92,33 @@ export default async function Home() {
       </header>
 
       <section className="rise-in mt-12 sm:mt-16">
+        {player && (
+          <div className="mb-5 flex items-center gap-3">
+            {player.avatarUrl && (
+              <Image
+                src={player.avatarUrl}
+                alt=""
+                width={44}
+                height={44}
+                unoptimized
+                className="rounded-full border border-line"
+              />
+            )}
+            <p className="text-sm font-medium">
+              {player.name}
+              <span className="block text-xs font-normal text-muted">
+                year in games
+              </span>
+            </p>
+          </div>
+        )}
         <h1 className="font-display text-[clamp(3.5rem,12vw,7rem)] leading-none tracking-tight">
           {year}
         </h1>
         <p className="mt-6 font-display text-4xl text-accent sm:text-5xl">
           {formatPlaytime(stats.totalMinutesFloor)}
           <span className="ml-3 font-sans text-base text-muted">
-            {totalIsFloorOnly
-              ? 'played this year, at minimum'
-              : 'played this year'}
+            played this year
           </span>
         </p>
         {stats.totalRecentMinutes > 0 && (
@@ -105,13 +126,10 @@ export default async function Home() {
             {formatPlaytime(stats.totalRecentMinutes)} in the past two weeks
           </p>
         )}
-        <p className="mt-3 text-sm text-muted">
-          {`Counted from daily snapshots (since ${formatDate(baselineDate)}) plus Steam's two-week playtime.`}
-          {baselineIsPartial && (
-            <span className="text-foreground">
-              {` Steam doesn't expose older history, so this floor only grows from here — but every game you touched in ${year} shows as played.`}
-            </span>
-          )}
+        <p className="mt-3 text-xs text-faint">
+          {totalIsFloorOnly && baselineIsPartial
+            ? `Live from Steam · tracking since ${formatDate(baselineDate)} · hours shown are a minimum`
+            : `Live from Steam · tracking since ${formatDate(baselineDate)}`}
         </p>
       </section>
 

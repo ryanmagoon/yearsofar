@@ -72,6 +72,56 @@ export async function getOwnedGames(): Promise<GameSnapshot[]> {
   return data.response.games.map(mapOwnedGame)
 }
 
+interface SteamPlayerSummariesResponse {
+  response?: {
+    players?: Array<{
+      personaname?: string
+      avatarfull?: string
+      profileurl?: string
+    }>
+  }
+}
+
+export interface PlayerSummary {
+  name: string
+  avatarUrl: string | null
+  profileUrl: string | null
+}
+
+/** Extracts the first player from a GetPlayerSummaries response. */
+export function mapPlayerSummary(
+  data: SteamPlayerSummariesResponse,
+): PlayerSummary | null {
+  const player = data.response?.players?.[0]
+  if (!player?.personaname) return null
+  return {
+    name: player.personaname,
+    avatarUrl: player.avatarfull ?? null,
+    profileUrl: player.profileurl ?? null,
+  }
+}
+
+/** Fetches the account's public persona name and avatar. Null on any failure. */
+export async function getPlayerSummary(): Promise<PlayerSummary | null> {
+  const apiKey = process.env.STEAM_API_KEY
+  const steamId = process.env.STEAM_ID
+  if (!apiKey || !steamId) return null
+
+  const url = new URL(
+    'https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/',
+  )
+  url.searchParams.set('key', apiKey)
+  url.searchParams.set('steamids', steamId)
+
+  try {
+    const res = await fetch(url, { next: { revalidate: 3600 } })
+    if (!res.ok) return null
+    return mapPlayerSummary((await res.json()) as SteamPlayerSummariesResponse)
+  } catch {
+    return null
+  }
+}
+
 interface SteamLastPlayedTimesEntry {
   appid: number
   /** Unix seconds; 0 or missing when Steam has no first-launch record. */

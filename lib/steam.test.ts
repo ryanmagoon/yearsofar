@@ -3,6 +3,7 @@ import {
   mapAchievementUnlocks,
   mapFirstPlayedTimes,
   mapOwnedGame,
+  mapPlayerSummary,
 } from './steam'
 
 describe('mapOwnedGame', () => {
@@ -78,5 +79,28 @@ describe('mapFirstPlayedTimes', () => {
 
   it('returns an empty map for malformed responses', () => {
     expect(mapFirstPlayedTimes({}).size).toBe(0)
+  })
+})
+
+describe('mapPlayerSummary', () => {
+  it('extracts name and avatar from the first player', () => {
+    const summary = mapPlayerSummary({
+      response: {
+        players: [
+          {
+            personaname: 'ryan',
+            avatarfull: 'https://avatars.example/full.jpg',
+            profileurl: 'https://steamcommunity.com/id/ryan/',
+          },
+        ],
+      },
+    })
+    expect(summary?.name).toBe('ryan')
+    expect(summary?.avatarUrl).toBe('https://avatars.example/full.jpg')
+  })
+
+  it('returns null when no player or persona name is present', () => {
+    expect(mapPlayerSummary({})).toBeNull()
+    expect(mapPlayerSummary({ response: { players: [{}] } })).toBeNull()
   })
 })
