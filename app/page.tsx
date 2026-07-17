@@ -33,18 +33,14 @@ export default async function Home() {
 
   const { stats, year, baselineDate, baselineIsPartial } = data
   const rows = stats.games.map(toGameRowJson)
-  // Fall back to two-week playtime before snapshot deltas have accumulated.
   const topGame = [...stats.games].sort(
-    (a, b) =>
-      b.minutesGained - a.minutesGained || b.recentMinutes - a.recentMinutes,
+    (a, b) => b.minutesThisYearFloor - a.minutesThisYearFloor,
   )[0]
   const topGamePlaytime =
-    topGame &&
-    (topGame.minutesGained > 0
-      ? `+${formatPlaytime(topGame.minutesGained)}`
-      : topGame.recentMinutes > 0
-        ? `${formatPlaytime(topGame.recentMinutes)} past two weeks`
-        : undefined)
+    topGame && topGame.minutesThisYearFloor > 0
+      ? `${topGame.minutesGained < topGame.minutesThisYearFloor ? '≥' : '+'}${formatPlaytime(topGame.minutesThisYearFloor)}`
+      : undefined
+  const totalIsFloorOnly = stats.totalMinutesGained < stats.totalMinutesFloor
   const lastPlayedGame = [...stats.games]
     .filter((g) => g.lastPlayed !== null)
     .sort(
@@ -86,9 +82,11 @@ export default async function Home() {
           {year}
         </h1>
         <p className="mt-6 font-display text-4xl text-accent sm:text-5xl">
-          {formatPlaytime(stats.totalMinutesGained)}
+          {formatPlaytime(stats.totalMinutesFloor)}
           <span className="ml-3 font-sans text-base text-muted">
-            tracked this year
+            {totalIsFloorOnly
+              ? 'played this year, at minimum'
+              : 'played this year'}
           </span>
         </p>
         {stats.totalRecentMinutes > 0 && (
@@ -97,10 +95,10 @@ export default async function Home() {
           </p>
         )}
         <p className="mt-3 text-sm text-muted">
-          Hours are measured against a snapshot from {formatDate(baselineDate)}.
+          {`Counted from daily snapshots (since ${formatDate(baselineDate)}) plus Steam's two-week playtime.`}
           {baselineIsPartial && (
             <span className="text-foreground">
-              {` Tracking started mid-year, so earlier ${year} hours aren't counted — but every game you touched in ${year} still shows as played.`}
+              {` Steam doesn't expose older history, so this floor only grows from here — but every game you touched in ${year} shows as played.`}
             </span>
           )}
         </p>

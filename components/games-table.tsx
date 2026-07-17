@@ -1,7 +1,7 @@
 'use client'
 
-import Image from 'next/image'
 import { useMemo, useState } from 'react'
+import { GameCapsule } from '@/components/game-capsule'
 import { formatDate, formatPlaytime } from '@/lib/format'
 import type { GameRowJson } from '@/lib/serialize'
 
@@ -21,19 +21,13 @@ const FILTER_LABELS: Record<Filter, string> = {
   'first-played': 'First played this year',
 }
 
-function capsuleUrl(appid: number): string {
-  return `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`
-}
-
 function sortGames(games: GameRowJson[], sort: SortKey): GameRowJson[] {
   const sorted = [...games]
   switch (sort) {
     case 'gained':
-      // Two-week playtime and recency break ties while deltas are still zero.
       return sorted.sort(
         (a, b) =>
-          b.minutesGained - a.minutesGained ||
-          b.recentMinutes - a.recentMinutes ||
+          b.minutesThisYearFloor - a.minutesThisYearFloor ||
           (b.lastPlayed ?? '').localeCompare(a.lastPlayed ?? ''),
       )
     case 'total':
@@ -115,14 +109,7 @@ export function GamesTable({ games }: { games: GameRowJson[] }) {
               key={game.appid}
               className="flex items-center gap-4 px-4 py-3 sm:gap-5"
             >
-              <Image
-                src={capsuleUrl(game.appid)}
-                alt=""
-                width={92}
-                height={35}
-                unoptimized
-                className="hidden h-[35px] w-[92px] shrink-0 rounded-sm border border-line object-cover sm:block"
-              />
+              <GameCapsule appid={game.appid} name={game.name} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{game.name}</p>
                 <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
@@ -146,9 +133,17 @@ export function GamesTable({ games }: { games: GameRowJson[] }) {
                 </p>
               </div>
               <div className="shrink-0 text-right font-mono text-sm">
-                {game.minutesGained > 0 ? (
-                  <p className="text-accent">
-                    +{formatPlaytime(game.minutesGained)}
+                {game.minutesThisYearFloor > 0 ? (
+                  <p
+                    className="text-accent"
+                    title={
+                      game.minutesGained < game.minutesThisYearFloor
+                        ? 'At least — Steam only proves two weeks of history, so the real figure may be higher'
+                        : undefined
+                    }
+                  >
+                    {game.minutesGained < game.minutesThisYearFloor ? '≥' : '+'}
+                    {formatPlaytime(game.minutesThisYearFloor)}
                   </p>
                 ) : (
                   <p className="text-faint">—</p>

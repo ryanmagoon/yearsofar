@@ -29,12 +29,19 @@ export interface GameYearRow {
   playedThisYear: boolean
   /** Minutes played in the last two weeks, live from Steam. */
   recentMinutes: number
+  /**
+   * Best provable minutes played this year: the larger of the snapshot delta
+   * and the two-week playtime (when that window sits fully inside the year).
+   * A floor, not an exact figure — real play can exceed it.
+   */
+  minutesThisYearFloor: number
 }
 
 export interface YearStats {
   games: GameYearRow[]
   totalMinutesGained: number
   totalRecentMinutes: number
+  totalMinutesFloor: number
   gamesPlayedCount: number
   firstPlayedCount: number
 }

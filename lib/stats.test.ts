@@ -169,6 +169,61 @@ describe('computeYearStats', () => {
     expect(stats.gamesPlayedCount).toBe(0)
   })
 
+  it('uses in-year two-week playtime as a floor for year minutes', () => {
+    const stats = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 3000 })],
+      [game({ appid: 1, playtimeMinutes: 3010, recentMinutes: 200 })],
+      YEAR,
+      new Date('2026-07-16T12:00:00Z'),
+    )
+    expect(stats.games[0]?.minutesThisYearFloor).toBe(200)
+    expect(stats.games[0]?.playedThisYear).toBe(true)
+    expect(stats.totalMinutesFloor).toBe(200)
+  })
+
+  it('prefers the snapshot delta once it exceeds the two-week floor', () => {
+    const stats = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 3000 })],
+      [game({ appid: 1, playtimeMinutes: 3500, recentMinutes: 200 })],
+      YEAR,
+      new Date('2026-07-16T12:00:00Z'),
+    )
+    expect(stats.games[0]?.minutesThisYearFloor).toBe(500)
+    expect(stats.totalMinutesFloor).toBe(500)
+  })
+
+  it('ignores the two-week floor in early January when the window straddles the year boundary', () => {
+    const stats = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 3000 })],
+      [game({ appid: 1, playtimeMinutes: 3000, recentMinutes: 200 })],
+      YEAR,
+      new Date('2026-01-05T12:00:00Z'),
+    )
+    expect(stats.games[0]?.minutesThisYearFloor).toBe(0)
+    expect(stats.totalMinutesFloor).toBe(0)
+  })
+
+  it('marks a game as first played this year when two-week playtime covers its whole lifetime, even against a same-day baseline', () => {
+    const stats = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 19 })],
+      [game({ appid: 1, playtimeMinutes: 19, recentMinutes: 19 })],
+      YEAR,
+      new Date('2026-07-16T12:00:00Z'),
+    )
+    expect(stats.games[0]?.firstPlayedThisYear).toBe(true)
+    expect(stats.firstPlayedCount).toBe(1)
+  })
+
+  it('does not infer first-played when lifetime playtime exceeds the two-week window', () => {
+    const stats = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 480 })],
+      [game({ appid: 1, playtimeMinutes: 480, recentMinutes: 360 })],
+      YEAR,
+      new Date('2026-07-16T12:00:00Z'),
+    )
+    expect(stats.games[0]?.firstPlayedThisYear).toBe(false)
+  })
+
   it('passes through two-week playtime and sums it', () => {
     const stats = computeYearStats(
       [game({ appid: 1, playtimeMinutes: 100 })],

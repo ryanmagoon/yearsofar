@@ -11,6 +11,7 @@ export interface GameRowJson {
   newToLibrary: boolean
   playedThisYear: boolean
   recentMinutes: number
+  minutesThisYearFloor: number
 }
 
 export function toGameRowJson(row: GameYearRow): GameRowJson {
