@@ -8,7 +8,7 @@ import { useState } from 'react'
  * some titles have no capsule at all — try each source, then fall back to a
  * typographic placeholder instead of a broken-image icon.
  */
-function artSources(appid: number): string[] {
+export function artSources(appid: number): string[] {
   return [
     `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
     `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/capsule_231x87.jpg`,

@@ -1,4 +1,5 @@
 import { GamesTable } from '@/components/games-table'
+import { SummaryCards, type SummaryItem } from '@/components/summary-cards'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { getYearSoFar } from '@/lib/data'
 import { formatDate, formatPlaytime } from '@/lib/format'
@@ -50,7 +51,7 @@ export default async function Home() {
     (g) => g.newToLibrary && g.playedThisYear,
   ).length
 
-  const summary = [
+  const summary: SummaryItem[] = [
     { label: 'Games played', value: String(stats.gamesPlayedCount) },
     { label: 'First played this year', value: String(stats.firstPlayedCount) },
     { label: 'New to library & played', value: String(newToLibraryCount) },
@@ -58,6 +59,7 @@ export default async function Home() {
       label: 'Most played',
       value: topGamePlaytime && topGame ? topGame.name : '—',
       detail: topGamePlaytime,
+      artAppid: topGamePlaytime ? topGame?.appid : undefined,
     },
     {
       label: 'Last played',
@@ -65,6 +67,7 @@ export default async function Home() {
       detail: lastPlayedGame?.lastPlayed
         ? formatDate(lastPlayedGame.lastPlayed.toISOString())
         : undefined,
+      artAppid: lastPlayedGame?.appid,
     },
   ]
 
@@ -104,28 +107,9 @@ export default async function Home() {
         </p>
       </section>
 
-      <section className="mt-12 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-5">
-        {summary.map((item, index) => (
-          <div
-            key={item.label}
-            className="rise-in bg-surface p-4"
-            style={{ animationDelay: `${60 + index * 40}ms` }}
-          >
-            <p className="text-xs text-muted">{item.label}</p>
-            <p
-              className="mt-2 truncate font-display text-xl"
-              title={item.value}
-            >
-              {item.value}
-            </p>
-            {item.detail && (
-              <p className="mt-0.5 font-mono text-xs text-accent">
-                {item.detail}
-              </p>
-            )}
-          </div>
-        ))}
-      </section>
+      <div className="mt-12">
+        <SummaryCards items={summary} />
+      </div>
 
       <div className="rise-in mt-14 [animation-delay:180ms]">
         <GamesTable games={rows} />
