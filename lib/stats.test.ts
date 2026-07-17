@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeYearStats } from './stats'
+import { applyFirstPlayedEvidence, computeYearStats } from './stats'
 import type { GameSnapshot } from './types'
 
 const YEAR = 2026
@@ -276,5 +276,59 @@ describe('computeYearStats', () => {
       YEAR,
     )
     expect(stats.games[0]?.name).toBe('New Name')
+  })
+})
+
+describe('applyFirstPlayedEvidence', () => {
+  function statsWith(overrides: Partial<GameSnapshot> & { appid: number }) {
+    return computeYearStats(
+      [game({ appid: overrides.appid, playtimeMinutes: 500 })],
+      [game({ playtimeMinutes: 500, ...overrides })],
+      YEAR,
+      new Date('2026-07-16T12:00:00Z'),
+    )
+  }
+
+  it('marks a game first-played when all achievement unlocks are in-year', () => {
+    const stats = applyFirstPlayedEvidence(
+      statsWith({ appid: 1, lastPlayed: new Date('2026-03-01') }),
+      new Map([[1, [new Date('2026-02-01'), new Date('2026-03-01')]]]),
+      YEAR,
+    )
+    expect(stats.games[0]?.firstPlayedThisYear).toBe(true)
+    expect(stats.firstPlayedCount).toBe(1)
+  })
+
+  it('leaves a game unmarked when any unlock predates the year', () => {
+    const stats = applyFirstPlayedEvidence(
+      statsWith({ appid: 1, lastPlayed: new Date('2026-03-01') }),
+      new Map([[1, [new Date('2024-11-20'), new Date('2026-03-01')]]]),
+      YEAR,
+    )
+    expect(stats.games[0]?.firstPlayedThisYear).toBe(false)
+  })
+
+  it('leaves a game unmarked when there is no achievement evidence', () => {
+    const stats = applyFirstPlayedEvidence(
+      statsWith({ appid: 1, lastPlayed: new Date('2026-03-01') }),
+      new Map([[1, []]]),
+      YEAR,
+    )
+    expect(stats.games[0]?.firstPlayedThisYear).toBe(false)
+  })
+
+  it('never revokes an already-proven first-played flag', () => {
+    const proven = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 0 })],
+      [game({ appid: 1, playtimeMinutes: 45 })],
+      YEAR,
+      new Date('2026-07-16T12:00:00Z'),
+    )
+    const stats = applyFirstPlayedEvidence(
+      proven,
+      new Map([[1, [new Date('2024-01-01')]]]),
+      YEAR,
+    )
+    expect(stats.games[0]?.firstPlayedThisYear).toBe(true)
   })
 })

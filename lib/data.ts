@@ -1,7 +1,10 @@
 import { getBaselineSnapshot, writeSnapshot } from './db'
-import { computeYearStats } from './stats'
-import { getOwnedGames } from './steam'
+import { applyFirstPlayedEvidence, computeYearStats } from './stats'
+import { getAchievementUnlocks, getOwnedGames } from './steam'
 import type { YearStats } from './types'
+
+/** Upper bound on per-request achievement lookups, to keep page latency sane. */
+const MAX_ACHIEVEMENT_LOOKUPS = 200
 
 export interface YearSoFar {
   stats: YearStats
@@ -33,8 +36,24 @@ export async function getYearSoFar(): Promise<YearSoFar> {
     baseline = { date: today, games: current }
   }
 
+  let stats = computeYearStats(baseline.games, current, year)
+
+  // Snapshot diffs can't see play from before tracking began, but achievement
+  // unlock dates can: fetch them for this year's games still unflagged.
+  const candidates = stats.games
+    .filter((game) => game.playedThisYear && !game.firstPlayedThisYear)
+    .sort((a, b) => b.minutesThisYearFloor - a.minutesThisYearFloor)
+    .slice(0, MAX_ACHIEVEMENT_LOOKUPS)
+  const evidence = new Map<number, Date[]>()
+  await Promise.all(
+    candidates.map(async (game) => {
+      evidence.set(game.appid, await getAchievementUnlocks(game.appid))
+    }),
+  )
+  stats = applyFirstPlayedEvidence(stats, evidence, year)
+
   return {
-    stats: computeYearStats(baseline.games, current, year),
+    stats,
     year,
     baselineDate: baseline.date,
     baselineIsPartial: baseline.date > `${year}-01-07`,

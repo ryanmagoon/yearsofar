@@ -54,7 +54,10 @@ export default async function Home() {
   const summary: SummaryItem[] = [
     { label: 'Games played', value: String(stats.gamesPlayedCount) },
     { label: 'First played this year', value: String(stats.firstPlayedCount) },
-    { label: 'New to library & played', value: String(newToLibraryCount) },
+    {
+      label: `New since ${formatDate(baselineDate)}`,
+      value: String(newToLibraryCount),
+    },
     {
       label: 'Most played',
       value: topGamePlaytime && topGame ? topGame.name : '—',
@@ -117,7 +120,9 @@ export default async function Home() {
 
       <footer className="mt-16 border-t border-line pt-5 text-xs text-faint">
         Playtime totals come from the Steam Web API. Yearly gains are measured
-        against daily snapshots taken by this site.
+        against daily snapshots taken by this site. First-played detection also
+        uses achievement unlock dates, so games without achievements may be
+        missed.
       </footer>
     </main>
   )

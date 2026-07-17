@@ -72,7 +72,57 @@ export async function getOwnedGames(): Promise<GameSnapshot[]> {
   return data.response.games.map(mapOwnedGame)
 }
 
-/** Steam CDN capsule image for a game (no API key needed). */
-export function capsuleImageUrl(appid: number): string {
-  return `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`
+interface SteamAchievement {
+  achieved: number
+  /** Unix seconds; 0 when the achievement is locked. */
+  unlocktime?: number
+}
+
+interface SteamPlayerAchievementsResponse {
+  playerstats?: {
+    success?: boolean
+    achievements?: SteamAchievement[]
+  }
+}
+
+/** Extracts unlock dates for earned achievements from a GetPlayerAchievements response. */
+export function mapAchievementUnlocks(
+  data: SteamPlayerAchievementsResponse,
+): Date[] {
+  if (!data.playerstats?.success || !data.playerstats.achievements) return []
+  return data.playerstats.achievements.flatMap((achievement) =>
+    achievement.achieved === 1 &&
+    achievement.unlocktime !== undefined &&
+    achievement.unlocktime > 0
+      ? [new Date(achievement.unlocktime * 1000)]
+      : [],
+  )
+}
+
+/**
+ * Fetches achievement unlock dates for one game. Returns [] for games without
+ * achievements, private stats, or any API failure — achievement evidence is
+ * best-effort and must never break the page.
+ */
+export async function getAchievementUnlocks(appid: number): Promise<Date[]> {
+  const apiKey = process.env.STEAM_API_KEY
+  const steamId = process.env.STEAM_ID
+  if (!apiKey || !steamId) return []
+
+  const url = new URL(
+    'https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/',
+  )
+  url.searchParams.set('key', apiKey)
+  url.searchParams.set('steamid', steamId)
+  url.searchParams.set('appid', String(appid))
+
+  try {
+    const res = await fetch(url, { next: { revalidate: 3600 } })
+    if (!res.ok) return []
+    return mapAchievementUnlocks(
+      (await res.json()) as SteamPlayerAchievementsResponse,
+    )
+  } catch {
+    return []
+  }
 }

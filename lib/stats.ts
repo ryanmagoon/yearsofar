@@ -30,6 +30,36 @@ function dedupeByAppid(games: GameSnapshot[]): Map<number, GameSnapshot> {
  */
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000
 
+/**
+ * Upgrades firstPlayedThisYear using achievement unlock dates: a game whose
+ * unlocks all fall within the year was, with near certainty, first played
+ * this year. Evidence can only add flags, never revoke proven ones; games
+ * with no evidence are left untouched.
+ */
+export function applyFirstPlayedEvidence(
+  stats: YearStats,
+  unlocksByAppid: Map<number, Date[]>,
+  year: number,
+): YearStats {
+  const games = stats.games.map((game) => {
+    if (game.firstPlayedThisYear) return game
+    const unlocks = unlocksByAppid.get(game.appid)
+    if (!unlocks || unlocks.length === 0) return game
+    const anyBeforeYear = unlocks.some((date) => date.getUTCFullYear() < year)
+    const anyInYear = unlocks.some((date) => date.getUTCFullYear() === year)
+    if (!anyBeforeYear && anyInYear) {
+      return { ...game, firstPlayedThisYear: true }
+    }
+    return game
+  })
+
+  return {
+    ...stats,
+    games,
+    firstPlayedCount: games.filter((g) => g.firstPlayedThisYear).length,
+  }
+}
+
 export function computeYearStats(
   baseline: GameSnapshot[],
   current: GameSnapshot[],
