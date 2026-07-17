@@ -2,7 +2,6 @@
 
 import Image from 'next/image'
 import { useState } from 'react'
-import { artSources } from '@/components/game-capsule'
 
 export interface SummaryItem {
   label: string
@@ -12,11 +11,20 @@ export interface SummaryItem {
   artAppid?: number
 }
 
+/** Higher-res header art reads better as a backdrop than the tiny capsule. */
+function backdropSources(appid: number): string[] {
+  return [
+    `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`,
+    `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/header.jpg`,
+    `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
+  ]
+}
+
 /** Blurred, theme-dimmed game art used as a tile backdrop. */
 function TileArt({ appid }: { appid: number }) {
   const [sourceIndex, setSourceIndex] = useState(0)
   const [loaded, setLoaded] = useState(false)
-  const sources = artSources(appid)
+  const sources = backdropSources(appid)
   if (sourceIndex >= sources.length) return null
 
   return (
@@ -28,11 +36,14 @@ function TileArt({ appid }: { appid: number }) {
         unoptimized
         onError={() => setSourceIndex((index) => index + 1)}
         onLoad={() => setLoaded(true)}
-        className={`scale-125 object-cover blur-[6px] transition-opacity duration-500 ease-(--ease-snappy) ${
+        className={`scale-110 object-cover blur-[2px] transition-opacity duration-500 ease-(--ease-snappy) ${
           loaded ? 'opacity-100' : 'opacity-0'
         }`}
       />
-      <div aria-hidden className="absolute inset-0 bg-surface/80" />
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-gradient-to-r from-surface/95 via-surface/75 to-surface/35"
+      />
     </>
   )
 }
