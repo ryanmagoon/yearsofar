@@ -113,6 +113,30 @@ export function applyFirstPlayedEvidence(
   }
 }
 
+/**
+ * Applies license acquisition dates (from the license_dates table, scraped
+ * off the Steam account page). A known date decides newToLibrary in both
+ * directions: acquired in-year marks a game new even when the baseline
+ * already contained it (bought before tracking began), and a pre-year date
+ * clears a false positive from a game re-appearing in the library. Games
+ * without a date keep their baseline-derived flag. Playtime figures are
+ * untouched.
+ */
+export function applyAcquiredDates(
+  stats: YearStats,
+  acquiredByAppid: Map<number, string>,
+  year: number,
+): YearStats {
+  return {
+    ...stats,
+    games: stats.games.map((game) => {
+      const acquired = acquiredByAppid.get(game.appid)
+      if (!acquired) return game
+      return { ...game, newToLibrary: acquired.startsWith(`${year}-`) }
+    }),
+  }
+}
+
 export function computeYearStats(
   baseline: GameSnapshot[],
   current: GameSnapshot[],

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyAcquiredDates,
   applyFirstPlayedEvidence,
   applyFirstPlayedTimes,
   computeYearStats,
@@ -384,6 +385,101 @@ describe('first-played games count their full lifetime toward the year', () => {
     )
     expect(stats.games[0]?.minutesThisYearFloor).toBe(900)
     expect(stats.totalMinutesFloor).toBe(900)
+  })
+})
+
+describe('applyAcquiredDates', () => {
+  const now = new Date('2026-07-16T12:00:00Z')
+
+  it('flags a baseline-present game as new when its license was acquired in-year', () => {
+    // Bought in February, tracking began in July: the baseline already
+    // contains the game, so the diff heuristic alone would miss it.
+    const base = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 300 })],
+      [game({ appid: 1, playtimeMinutes: 300 })],
+      YEAR,
+      now,
+    )
+    expect(base.games[0]?.newToLibrary).toBe(false)
+
+    const stats = applyAcquiredDates(base, new Map([[1, '2026-02-14']]), YEAR)
+    expect(stats.games[0]?.newToLibrary).toBe(true)
+  })
+
+  it('unflags a baseline-absent game when its license predates the year', () => {
+    // A game can drop out of a snapshot and reappear (family sharing quirks);
+    // the acquired date proves it is not actually new.
+    const base = computeYearStats(
+      [],
+      [game({ appid: 1, playtimeMinutes: 300 })],
+      YEAR,
+      now,
+    )
+    expect(base.games[0]?.newToLibrary).toBe(true)
+
+    const stats = applyAcquiredDates(base, new Map([[1, '2019-11-02']]), YEAR)
+    expect(stats.games[0]?.newToLibrary).toBe(false)
+  })
+
+  it('leaves games without an acquired date untouched', () => {
+    const base = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 10 })],
+      [game({ appid: 1, playtimeMinutes: 10 }), game({ appid: 2 })],
+      YEAR,
+      now,
+    )
+    const stats = applyAcquiredDates(base, new Map([[99, '2026-01-05']]), YEAR)
+    expect(stats.games.find((g) => g.appid === 1)?.newToLibrary).toBe(false)
+    expect(stats.games.find((g) => g.appid === 2)?.newToLibrary).toBe(true)
+  })
+
+  it('treats the year boundaries inclusively', () => {
+    const base = computeYearStats(
+      [
+        game({ appid: 1, playtimeMinutes: 1 }),
+        game({ appid: 2, playtimeMinutes: 1 }),
+        game({ appid: 3, playtimeMinutes: 1 }),
+        game({ appid: 4, playtimeMinutes: 1 }),
+      ],
+      [
+        game({ appid: 1, playtimeMinutes: 1 }),
+        game({ appid: 2, playtimeMinutes: 1 }),
+        game({ appid: 3, playtimeMinutes: 1 }),
+        game({ appid: 4, playtimeMinutes: 1 }),
+      ],
+      YEAR,
+      now,
+    )
+    const stats = applyAcquiredDates(
+      base,
+      new Map([
+        [1, '2025-12-31'],
+        [2, '2026-01-01'],
+        [3, '2026-12-31'],
+        [4, '2027-01-01'],
+      ]),
+      YEAR,
+    )
+    expect(stats.games.map((g) => g.newToLibrary)).toEqual([
+      false,
+      true,
+      true,
+      false,
+    ])
+  })
+
+  it('does not change playtime floors or totals', () => {
+    const base = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 100 })],
+      [game({ appid: 1, playtimeMinutes: 250 })],
+      YEAR,
+      now,
+    )
+    const stats = applyAcquiredDates(base, new Map([[1, '2026-03-03']]), YEAR)
+    expect(stats.games[0]?.minutesThisYearFloor).toBe(150)
+    expect(stats.totalMinutesFloor).toBe(base.totalMinutesFloor)
+    expect(stats.totalMinutesGained).toBe(base.totalMinutesGained)
+    expect(stats.gamesPlayedCount).toBe(base.gamesPlayedCount)
   })
 })
 
