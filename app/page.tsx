@@ -100,10 +100,7 @@ export default async function Home() {
           Hours are measured against a snapshot from {formatDate(baselineDate)}.
           {baselineIsPartial && (
             <span className="text-foreground">
-              {' '}
-              Tracking started mid-year, so earlier {year} hours aren&apos;t
-              counted — but every game you touched in {year} still shows as
-              played.
+              {` Tracking started mid-year, so earlier ${year} hours aren't counted — but every game you touched in ${year} still shows as played.`}
             </span>
           )}
         </p>
