@@ -39,7 +39,12 @@ export default async function Home() {
   )[0]
   const topGamePlaytime =
     topGame && topGame.minutesThisYearFloor > 0
-      ? `${topGame.minutesGained < topGame.minutesThisYearFloor ? '≥' : '+'}${formatPlaytime(topGame.minutesThisYearFloor)}`
+      ? `${
+          !topGame.firstPlayedThisYear &&
+          topGame.minutesGained < topGame.minutesThisYearFloor
+            ? '≥'
+            : '+'
+        }${formatPlaytime(topGame.minutesThisYearFloor)}`
       : undefined
   const totalIsFloorOnly = stats.totalMinutesGained < stats.totalMinutesFloor
   const lastPlayedGame = [...stats.games]

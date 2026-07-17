@@ -332,3 +332,53 @@ describe('applyFirstPlayedEvidence', () => {
     expect(stats.games[0]?.firstPlayedThisYear).toBe(true)
   })
 })
+
+describe('first-played games count their full lifetime toward the year', () => {
+  it('raises the floor to lifetime playtime when evidence flips first-played', () => {
+    const base = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 3048 })],
+      [
+        game({
+          appid: 1,
+          playtimeMinutes: 3048,
+          recentMinutes: 2244,
+          lastPlayed: new Date('2026-07-04'),
+        }),
+      ],
+      YEAR,
+      new Date('2026-07-16T12:00:00Z'),
+    )
+    expect(base.games[0]?.minutesThisYearFloor).toBe(2244)
+
+    const stats = applyFirstPlayedEvidence(
+      base,
+      new Map([[1, [new Date('2026-06-20'), new Date('2026-07-01')]]]),
+      YEAR,
+    )
+    expect(stats.games[0]?.minutesThisYearFloor).toBe(3048)
+    expect(stats.totalMinutesFloor).toBe(3048)
+  })
+
+  it('leaves the floor untouched when evidence does not flip the flag', () => {
+    const base = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 1000 })],
+      [
+        game({
+          appid: 1,
+          playtimeMinutes: 1000,
+          recentMinutes: 900,
+          lastPlayed: new Date('2026-07-04'),
+        }),
+      ],
+      YEAR,
+      new Date('2026-07-16T12:00:00Z'),
+    )
+    const stats = applyFirstPlayedEvidence(
+      base,
+      new Map([[1, [new Date('2024-05-05'), new Date('2026-07-01')]]]),
+      YEAR,
+    )
+    expect(stats.games[0]?.minutesThisYearFloor).toBe(900)
+    expect(stats.totalMinutesFloor).toBe(900)
+  })
+})

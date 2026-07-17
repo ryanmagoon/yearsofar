@@ -137,12 +137,16 @@ export function GamesTable({ games }: { games: GameRowJson[] }) {
                   <p
                     className="text-accent"
                     title={
+                      !game.firstPlayedThisYear &&
                       game.minutesGained < game.minutesThisYearFloor
                         ? 'At least — Steam only proves two weeks of history, so the real figure may be higher'
                         : undefined
                     }
                   >
-                    {game.minutesGained < game.minutesThisYearFloor ? '≥' : '+'}
+                    {!game.firstPlayedThisYear &&
+                    game.minutesGained < game.minutesThisYearFloor
+                      ? '≥'
+                      : '+'}
                     {formatPlaytime(game.minutesThisYearFloor)}
                   </p>
                 ) : (

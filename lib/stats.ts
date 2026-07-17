@@ -33,8 +33,9 @@ const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000
 /**
  * Upgrades firstPlayedThisYear using achievement unlock dates: a game whose
  * unlocks all fall within the year was, with near certainty, first played
- * this year. Evidence can only add flags, never revoke proven ones; games
- * with no evidence are left untouched.
+ * this year — which also means its entire lifetime playtime happened this
+ * year, so the year floor rises to the lifetime total. Evidence can only add
+ * flags, never revoke proven ones; games with no evidence are left untouched.
  */
 export function applyFirstPlayedEvidence(
   stats: YearStats,
@@ -48,7 +49,14 @@ export function applyFirstPlayedEvidence(
     const anyBeforeYear = unlocks.some((date) => date.getUTCFullYear() < year)
     const anyInYear = unlocks.some((date) => date.getUTCFullYear() === year)
     if (!anyBeforeYear && anyInYear) {
-      return { ...game, firstPlayedThisYear: true }
+      return {
+        ...game,
+        firstPlayedThisYear: true,
+        minutesThisYearFloor: Math.max(
+          game.minutesThisYearFloor,
+          game.totalMinutes,
+        ),
+      }
     }
     return game
   })
@@ -56,6 +64,10 @@ export function applyFirstPlayedEvidence(
   return {
     ...stats,
     games,
+    totalMinutesFloor: games.reduce(
+      (sum, g) => sum + g.minutesThisYearFloor,
+      0,
+    ),
     firstPlayedCount: games.filter((g) => g.firstPlayedThisYear).length,
   }
 }
