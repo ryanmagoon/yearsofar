@@ -31,7 +31,7 @@ calendar year, updated continuously from the Steam Web API.
 
 ## Database schema
 
-One table, created automatically on first write:
+Two tables, created automatically on first write:
 
 ```sql
 CREATE TABLE snapshots (
@@ -42,7 +42,20 @@ CREATE TABLE snapshots (
   last_played      timestamptz,
   PRIMARY KEY (snapshot_date, appid)
 );
+
+CREATE TABLE license_dates (
+  appid    integer PRIMARY KEY,
+  acquired date    NOT NULL
+);
 ```
+
+`license_dates` holds per-game license acquisition dates (the Steam Web API
+doesn't expose purchase dates, so these are scraped once from the account's
+[licenses page](https://store.steampowered.com/account/licenses/) and loaded
+via `POST /api/admin/license-dates` with `Authorization: Bearer $ADMIN_SECRET`
+and body `{ "dates": [{ "appid": 440, "acquired": "2011-06-24" }] }`). When
+present, they make "new to library" mean _acquired this calendar year_ instead
+of _appeared after the baseline snapshot_.
 
 ## Environment variables
 
@@ -52,6 +65,7 @@ CREATE TABLE snapshots (
 | `STEAM_ID`      | Your 64-bit SteamID (e.g. from <https://steamid.io>)                                              |
 | `DATABASE_URL`  | Postgres connection string (the Neon integration on Vercel sets this automatically)               |
 | `CRON_SECRET`   | Any random string; Vercel sends it as a bearer token to the cron route so outsiders can't spam it |
+| `ADMIN_SECRET`  | Any random string; bearer token for the one-off license-dates loader route (optional otherwise)   |
 
 Your Steam profile's **Game details** privacy setting must be **Public** for
 the API to return playtime.

@@ -1,5 +1,6 @@
-import { getBaselineSnapshot, writeSnapshot } from './db'
+import { getBaselineSnapshot, getLicenseDates, writeSnapshot } from './db'
 import {
+  applyAcquiredDates,
   applyFirstPlayedEvidence,
   applyFirstPlayedTimes,
   computeYearStats,
@@ -21,6 +22,11 @@ export interface YearSoFar {
   baselineDate: string
   /** True if the baseline was taken after Jan 7 — the UI should flag partial-year tracking. */
   baselineIsPartial: boolean
+  /**
+   * True when license acquisition dates are loaded, i.e. "new to library" is
+   * based on real purchase dates rather than absence from the baseline.
+   */
+  hasAcquiredDates: boolean
 }
 
 /** Current date in UTC as yyyy-mm-dd. */
@@ -45,6 +51,11 @@ export async function getYearSoFar(): Promise<YearSoFar> {
   }
 
   let stats = computeYearStats(baseline.games, current, year)
+
+  // License acquisition dates (when loaded) decide "new to library" from
+  // real purchase dates instead of absence from the baseline snapshot.
+  const acquiredDates = await getLicenseDates()
+  stats = applyAcquiredDates(stats, acquiredDates, year)
 
   // Steam's own first-launch records are authoritative — apply them first.
   const firstPlayedTimes = await getFirstPlayedTimes()
@@ -74,5 +85,6 @@ export async function getYearSoFar(): Promise<YearSoFar> {
     year,
     baselineDate: baseline.date,
     baselineIsPartial: baseline.date > `${year}-01-07`,
+    hasAcquiredDates: acquiredDates.size > 0,
   }
 }
