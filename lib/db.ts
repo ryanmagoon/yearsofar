@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless'
+import type { LicenseDate } from './license-dates'
 import type { GameSnapshot } from './types'
 
 function getSql() {
@@ -55,6 +56,47 @@ export async function writeSnapshot(
       playtime_minutes = GREATEST(snapshots.playtime_minutes, EXCLUDED.playtime_minutes),
       last_played = COALESCE(EXCLUDED.last_played, snapshots.last_played)
   `
+}
+
+/** Creates the license_dates table if it doesn't exist. Idempotent and cheap. */
+async function ensureLicenseSchema(): Promise<void> {
+  const sql = getSql()
+  await sql`
+    CREATE TABLE IF NOT EXISTS license_dates (
+      appid integer PRIMARY KEY,
+      acquired date NOT NULL
+    )
+  `
+}
+
+/**
+ * Upserts license acquisition dates. Re-runs keep the earliest date per
+ * appid, so loading overlapping scrapes can never push a date later.
+ */
+export async function upsertLicenseDates(dates: LicenseDate[]): Promise<void> {
+  if (dates.length === 0) return
+  await ensureLicenseSchema()
+  const sql = getSql()
+  await sql`
+    INSERT INTO license_dates (appid, acquired)
+    SELECT appid, acquired
+    FROM unnest(
+      ${dates.map((d) => d.appid)}::integer[],
+      ${dates.map((d) => d.acquired)}::date[]
+    ) AS t(appid, acquired)
+    ON CONFLICT (appid) DO UPDATE SET
+      acquired = LEAST(license_dates.acquired, EXCLUDED.acquired)
+  `
+}
+
+/** Returns every stored license acquisition date, keyed by appid (yyyy-mm-dd). */
+export async function getLicenseDates(): Promise<Map<number, string>> {
+  await ensureLicenseSchema()
+  const sql = getSql()
+  const rows = (await sql`
+    SELECT appid, acquired::text FROM license_dates
+  `) as { appid: number; acquired: string }[]
+  return new Map(rows.map((row) => [row.appid, row.acquired]))
 }
 
 interface SnapshotRow {
