@@ -72,6 +72,57 @@ export async function getOwnedGames(): Promise<GameSnapshot[]> {
   return data.response.games.map(mapOwnedGame)
 }
 
+interface SteamLastPlayedTimesEntry {
+  appid: number
+  /** Unix seconds; 0 or missing when Steam has no first-launch record. */
+  first_playtime?: number
+}
+
+interface SteamLastPlayedTimesResponse {
+  response?: {
+    games?: SteamLastPlayedTimesEntry[]
+  }
+}
+
+/** Extracts per-appid first-launch dates from a ClientGetLastPlayedTimes response. */
+export function mapFirstPlayedTimes(
+  data: SteamLastPlayedTimesResponse,
+): Map<number, Date> {
+  const byAppid = new Map<number, Date>()
+  for (const entry of data.response?.games ?? []) {
+    if (entry.first_playtime !== undefined && entry.first_playtime > 0) {
+      byAppid.set(entry.appid, new Date(entry.first_playtime * 1000))
+    }
+  }
+  return byAppid
+}
+
+/**
+ * Fetches Steam's authoritative first-launch timestamps for every game on
+ * the account that owns STEAM_API_KEY (the endpoint takes no steamid — it is
+ * scoped to the key's own account). Returns an empty map on any failure so
+ * the heuristic fallbacks still apply.
+ */
+export async function getFirstPlayedTimes(): Promise<Map<number, Date>> {
+  const apiKey = process.env.STEAM_API_KEY
+  if (!apiKey) return new Map()
+
+  const url = new URL(
+    'https://api.steampowered.com/IPlayerService/ClientGetLastPlayedTimes/v1/',
+  )
+  url.searchParams.set('key', apiKey)
+
+  try {
+    const res = await fetch(url, { next: { revalidate: 3600 } })
+    if (!res.ok) return new Map()
+    return mapFirstPlayedTimes(
+      (await res.json()) as SteamLastPlayedTimesResponse,
+    )
+  } catch {
+    return new Map()
+  }
+}
+
 interface SteamAchievement {
   achieved: number
   /** Unix seconds; 0 when the achievement is locked. */

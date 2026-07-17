@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { applyFirstPlayedEvidence, computeYearStats } from './stats'
+import {
+  applyFirstPlayedEvidence,
+  applyFirstPlayedTimes,
+  computeYearStats,
+} from './stats'
 import type { GameSnapshot } from './types'
 
 const YEAR = 2026
@@ -380,5 +384,67 @@ describe('first-played games count their full lifetime toward the year', () => {
     )
     expect(stats.games[0]?.minutesThisYearFloor).toBe(900)
     expect(stats.totalMinutesFloor).toBe(900)
+  })
+})
+
+describe('applyFirstPlayedTimes', () => {
+  const now = new Date('2026-07-16T12:00:00Z')
+
+  it('flags a game whose authoritative first-played date is in-year and counts its lifetime', () => {
+    const base = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 8 })],
+      [
+        game({
+          appid: 1,
+          playtimeMinutes: 8,
+          lastPlayed: new Date('2026-06-30'),
+        }),
+      ],
+      YEAR,
+      now,
+    )
+    expect(base.games[0]?.firstPlayedThisYear).toBe(false)
+
+    const stats = applyFirstPlayedTimes(
+      base,
+      new Map([[1, new Date('2026-06-30T20:00:00Z')]]),
+      YEAR,
+    )
+    expect(stats.games[0]?.firstPlayedThisYear).toBe(true)
+    expect(stats.games[0]?.minutesThisYearFloor).toBe(8)
+    expect(stats.games[0]?.playedThisYear).toBe(true)
+    expect(stats.firstPlayedCount).toBe(1)
+    expect(stats.totalMinutesFloor).toBe(8)
+  })
+
+  it('overrides a heuristic first-played flag when the authoritative date predates the year', () => {
+    const base = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 19 })],
+      [game({ appid: 1, playtimeMinutes: 19, recentMinutes: 19 })],
+      YEAR,
+      now,
+    )
+    expect(base.games[0]?.firstPlayedThisYear).toBe(true)
+
+    const stats = applyFirstPlayedTimes(
+      base,
+      new Map([[1, new Date('2024-03-03')]]),
+      YEAR,
+    )
+    expect(stats.games[0]?.firstPlayedThisYear).toBe(false)
+    expect(stats.firstPlayedCount).toBe(0)
+    expect(stats.games[0]?.minutesThisYearFloor).toBe(19)
+  })
+
+  it('leaves games without an authoritative record untouched', () => {
+    const base = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 100 })],
+      [game({ appid: 1, playtimeMinutes: 100 })],
+      YEAR,
+      now,
+    )
+    const stats = applyFirstPlayedTimes(base, new Map(), YEAR)
+    expect(stats.games[0]?.firstPlayedThisYear).toBe(false)
+    expect(stats.games[0]?.playedThisYear).toBe(false)
   })
 })

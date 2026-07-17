@@ -31,6 +31,47 @@ function dedupeByAppid(games: GameSnapshot[]): Map<number, GameSnapshot> {
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000
 
 /**
+ * Applies Steam's authoritative per-game first-played timestamps (from
+ * ClientGetLastPlayedTimes). Unlike heuristics, these override in both
+ * directions: an in-year date proves first-played (and the game's whole
+ * lifetime counts toward the year), a pre-year date disproves it even when a
+ * heuristic said otherwise. Games without a record are left untouched.
+ */
+export function applyFirstPlayedTimes(
+  stats: YearStats,
+  firstPlayedByAppid: Map<number, Date>,
+  year: number,
+): YearStats {
+  const games = stats.games.map((game) => {
+    const firstPlayed = firstPlayedByAppid.get(game.appid)
+    if (!firstPlayed) return game
+    if (firstPlayed.getUTCFullYear() === year) {
+      return {
+        ...game,
+        firstPlayedThisYear: true,
+        playedThisYear: true,
+        minutesThisYearFloor: Math.max(
+          game.minutesThisYearFloor,
+          game.totalMinutes,
+        ),
+      }
+    }
+    return { ...game, firstPlayedThisYear: false }
+  })
+
+  return {
+    ...stats,
+    games,
+    totalMinutesFloor: games.reduce(
+      (sum, g) => sum + g.minutesThisYearFloor,
+      0,
+    ),
+    gamesPlayedCount: games.filter((g) => g.playedThisYear).length,
+    firstPlayedCount: games.filter((g) => g.firstPlayedThisYear).length,
+  }
+}
+
+/**
  * Upgrades firstPlayedThisYear using achievement unlock dates: a game whose
  * unlocks all fall within the year was, with near certainty, first played
  * this year — which also means its entire lifetime playtime happened this

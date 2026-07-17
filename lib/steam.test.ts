@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { mapAchievementUnlocks, mapOwnedGame } from './steam'
+import {
+  mapAchievementUnlocks,
+  mapFirstPlayedTimes,
+  mapOwnedGame,
+} from './steam'
 
 describe('mapOwnedGame', () => {
   it('treats rtime_last_played of 0 as no last-played record', () => {
@@ -54,5 +58,25 @@ describe('mapAchievementUnlocks', () => {
       [],
     )
     expect(mapAchievementUnlocks({})).toEqual([])
+  })
+})
+
+describe('mapFirstPlayedTimes', () => {
+  it('maps appids to first-launch dates, skipping zero/missing timestamps', () => {
+    const times = mapFirstPlayedTimes({
+      response: {
+        games: [
+          { appid: 10, first_playtime: 1_751_500_000 },
+          { appid: 20, first_playtime: 0 },
+          { appid: 30 },
+        ],
+      },
+    })
+    expect(times.size).toBe(1)
+    expect(times.get(10)?.getTime()).toBe(1_751_500_000_000)
+  })
+
+  it('returns an empty map for malformed responses', () => {
+    expect(mapFirstPlayedTimes({}).size).toBe(0)
   })
 })

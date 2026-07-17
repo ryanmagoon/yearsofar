@@ -1,6 +1,14 @@
 import { getBaselineSnapshot, writeSnapshot } from './db'
-import { applyFirstPlayedEvidence, computeYearStats } from './stats'
-import { getAchievementUnlocks, getOwnedGames } from './steam'
+import {
+  applyFirstPlayedEvidence,
+  applyFirstPlayedTimes,
+  computeYearStats,
+} from './stats'
+import {
+  getAchievementUnlocks,
+  getFirstPlayedTimes,
+  getOwnedGames,
+} from './steam'
 import type { YearStats } from './types'
 
 /** Upper bound on per-request achievement lookups, to keep page latency sane. */
@@ -38,10 +46,19 @@ export async function getYearSoFar(): Promise<YearSoFar> {
 
   let stats = computeYearStats(baseline.games, current, year)
 
-  // Snapshot diffs can't see play from before tracking began, but achievement
-  // unlock dates can: fetch them for this year's games still unflagged.
+  // Steam's own first-launch records are authoritative — apply them first.
+  const firstPlayedTimes = await getFirstPlayedTimes()
+  stats = applyFirstPlayedTimes(stats, firstPlayedTimes, year)
+
+  // For games Steam has no first-launch record for, fall back to achievement
+  // unlock dates (all unlocks in-year implies first played this year).
   const candidates = stats.games
-    .filter((game) => game.playedThisYear && !game.firstPlayedThisYear)
+    .filter(
+      (game) =>
+        game.playedThisYear &&
+        !game.firstPlayedThisYear &&
+        !firstPlayedTimes.has(game.appid),
+    )
     .sort((a, b) => b.minutesThisYearFloor - a.minutesThisYearFloor)
     .slice(0, MAX_ACHIEVEMENT_LOOKUPS)
   const evidence = new Map<number, Date[]>()
