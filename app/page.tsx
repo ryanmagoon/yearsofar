@@ -75,7 +75,7 @@ export default async function Home() {
         <ThemeToggle />
       </header>
 
-      <section className="mt-12 sm:mt-16">
+      <section className="rise-in mt-12 sm:mt-16">
         <h1 className="font-display text-[clamp(3.5rem,12vw,7rem)] leading-none tracking-tight">
           {year}
         </h1>
@@ -98,8 +98,12 @@ export default async function Home() {
       </section>
 
       <section className="mt-12 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-5">
-        {summary.map((item) => (
-          <div key={item.label} className="bg-surface p-4">
+        {summary.map((item, index) => (
+          <div
+            key={item.label}
+            className="rise-in bg-surface p-4"
+            style={{ animationDelay: `${60 + index * 40}ms` }}
+          >
             <p className="text-xs text-muted">{item.label}</p>
             <p
               className="mt-2 truncate font-display text-xl"
@@ -116,7 +120,7 @@ export default async function Home() {
         ))}
       </section>
 
-      <div className="mt-14">
+      <div className="rise-in mt-14 [animation-delay:180ms]">
         <GamesTable games={rows} />
       </div>
 

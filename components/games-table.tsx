@@ -65,7 +65,7 @@ export function GamesTable({ games }: { games: GameRowJson[] }) {
               key={key}
               type="button"
               onClick={() => setFilter(key)}
-              className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+              className={`rounded-full border px-3 py-1.5 text-xs transition-[color,background-color,border-color,transform] duration-150 ease-(--ease-snappy) active:scale-[0.97] ${
                 filter === key
                   ? 'border-accent bg-accent-soft text-accent'
                   : 'border-line text-muted hover:border-faint hover:text-foreground'
