@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { computeYearStats } from './stats'
 import type { GameSnapshot } from './types'
 
+const YEAR = 2026
+
 function game(
   overrides: Partial<GameSnapshot> & { appid: number },
 ): GameSnapshot {
@@ -15,9 +17,10 @@ function game(
 
 describe('computeYearStats', () => {
   it('returns empty stats when both snapshots are empty', () => {
-    const stats = computeYearStats([], [])
+    const stats = computeYearStats([], [], YEAR)
     expect(stats.games).toEqual([])
     expect(stats.totalMinutesGained).toBe(0)
+    expect(stats.totalRecentMinutes).toBe(0)
     expect(stats.gamesPlayedCount).toBe(0)
     expect(stats.firstPlayedCount).toBe(0)
   })
@@ -26,6 +29,7 @@ describe('computeYearStats', () => {
     const stats = computeYearStats(
       [game({ appid: 1, playtimeMinutes: 500 })],
       [game({ appid: 1, playtimeMinutes: 400 })],
+      YEAR,
     )
     expect(stats.games[0]?.minutesGained).toBe(0)
     expect(stats.games[0]?.playedThisYear).toBe(false)
@@ -42,6 +46,7 @@ describe('computeYearStats', () => {
         game({ appid: 1, playtimeMinutes: 150 }),
         game({ appid: 1, playtimeMinutes: 160 }),
       ],
+      YEAR,
     )
     expect(stats.games).toHaveLength(1)
     expect(stats.games[0]?.minutesGained).toBe(60)
@@ -51,6 +56,7 @@ describe('computeYearStats', () => {
     const stats = computeYearStats(
       [game({ appid: 1, playtimeMinutes: 0 })],
       [game({ appid: 1, playtimeMinutes: 0 })],
+      YEAR,
     )
     expect(stats.games).toHaveLength(1)
     expect(stats.games[0]?.playedThisYear).toBe(false)
@@ -62,6 +68,7 @@ describe('computeYearStats', () => {
     const stats = computeYearStats(
       [game({ appid: 1, playtimeMinutes: 10 })],
       [game({ appid: 1, playtimeMinutes: 30, lastPlayed: null })],
+      YEAR,
     )
     expect(stats.games[0]?.lastPlayed).toBeNull()
     expect(stats.games[0]?.minutesGained).toBe(20)
@@ -74,6 +81,7 @@ describe('computeYearStats', () => {
         game({ appid: 2, playtimeMinutes: 50 }),
       ],
       [game({ appid: 1, playtimeMinutes: 120 })],
+      YEAR,
     )
     expect(stats.games).toHaveLength(1)
     expect(stats.games[0]?.appid).toBe(1)
@@ -86,6 +94,7 @@ describe('computeYearStats', () => {
         game({ appid: 1, playtimeMinutes: 100 }),
         game({ appid: 2, playtimeMinutes: 300 }),
       ],
+      YEAR,
     )
     const newGame = stats.games.find((g) => g.appid === 2)
     expect(newGame?.newToLibrary).toBe(true)
@@ -95,7 +104,11 @@ describe('computeYearStats', () => {
   })
 
   it('marks a new-to-library game with zero playtime as unplayed, not first-played', () => {
-    const stats = computeYearStats([], [game({ appid: 2, playtimeMinutes: 0 })])
+    const stats = computeYearStats(
+      [],
+      [game({ appid: 2, playtimeMinutes: 0 })],
+      YEAR,
+    )
     const newGame = stats.games[0]
     expect(newGame?.newToLibrary).toBe(true)
     expect(newGame?.firstPlayedThisYear).toBe(false)
@@ -106,6 +119,7 @@ describe('computeYearStats', () => {
     const stats = computeYearStats(
       [game({ appid: 1, playtimeMinutes: 0 })],
       [game({ appid: 1, playtimeMinutes: 45 })],
+      YEAR,
     )
     expect(stats.games[0]?.firstPlayedThisYear).toBe(true)
     expect(stats.games[0]?.newToLibrary).toBe(false)
@@ -116,9 +130,66 @@ describe('computeYearStats', () => {
     const stats = computeYearStats(
       [game({ appid: 1, playtimeMinutes: 200 })],
       [game({ appid: 1, playtimeMinutes: 260 })],
+      YEAR,
     )
     expect(stats.games[0]?.firstPlayedThisYear).toBe(false)
     expect(stats.games[0]?.playedThisYear).toBe(true)
+  })
+
+  it('marks a game with no delta but a last-played date within the year as played this year', () => {
+    const stats = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 900 })],
+      [
+        game({
+          appid: 1,
+          playtimeMinutes: 900,
+          lastPlayed: new Date('2026-03-15T20:00:00Z'),
+        }),
+      ],
+      YEAR,
+    )
+    expect(stats.games[0]?.playedThisYear).toBe(true)
+    expect(stats.games[0]?.minutesGained).toBe(0)
+    expect(stats.gamesPlayedCount).toBe(1)
+  })
+
+  it('does not mark a game last played in a previous year as played this year', () => {
+    const stats = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 900 })],
+      [
+        game({
+          appid: 1,
+          playtimeMinutes: 900,
+          lastPlayed: new Date('2025-12-31T23:00:00Z'),
+        }),
+      ],
+      YEAR,
+    )
+    expect(stats.games[0]?.playedThisYear).toBe(false)
+    expect(stats.gamesPlayedCount).toBe(0)
+  })
+
+  it('passes through two-week playtime and sums it', () => {
+    const stats = computeYearStats(
+      [game({ appid: 1, playtimeMinutes: 100 })],
+      [
+        game({ appid: 1, playtimeMinutes: 130, recentMinutes: 30 }),
+        game({ appid: 2, playtimeMinutes: 45, recentMinutes: 45 }),
+      ],
+      YEAR,
+    )
+    expect(stats.games.find((g) => g.appid === 1)?.recentMinutes).toBe(30)
+    expect(stats.totalRecentMinutes).toBe(75)
+  })
+
+  it('defaults missing two-week playtime to zero (stored snapshots have none)', () => {
+    const stats = computeYearStats(
+      [],
+      [game({ appid: 1, playtimeMinutes: 10 })],
+      YEAR,
+    )
+    expect(stats.games[0]?.recentMinutes).toBe(0)
+    expect(stats.totalRecentMinutes).toBe(0)
   })
 
   it('aggregates totals across multiple games', () => {
@@ -135,6 +206,7 @@ describe('computeYearStats', () => {
         game({ appid: 3, playtimeMinutes: 500 }),
         game({ appid: 4, playtimeMinutes: 30, lastPlayed }),
       ],
+      YEAR,
     )
     expect(stats.totalMinutesGained).toBe(60 + 90 + 30)
     expect(stats.gamesPlayedCount).toBe(3)
@@ -146,6 +218,7 @@ describe('computeYearStats', () => {
     const stats = computeYearStats(
       [game({ appid: 1, name: 'Old Name', playtimeMinutes: 10 })],
       [game({ appid: 1, name: 'New Name', playtimeMinutes: 20 })],
+      YEAR,
     )
     expect(stats.games[0]?.name).toBe('New Name')
   })

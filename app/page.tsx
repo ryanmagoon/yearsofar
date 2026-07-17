@@ -33,9 +33,18 @@ export default async function Home() {
 
   const { stats, year, baselineDate, baselineIsPartial } = data
   const rows = stats.games.map(toGameRowJson)
+  // Fall back to two-week playtime before snapshot deltas have accumulated.
   const topGame = [...stats.games].sort(
-    (a, b) => b.minutesGained - a.minutesGained,
+    (a, b) =>
+      b.minutesGained - a.minutesGained || b.recentMinutes - a.recentMinutes,
   )[0]
+  const topGamePlaytime =
+    topGame &&
+    (topGame.minutesGained > 0
+      ? `+${formatPlaytime(topGame.minutesGained)}`
+      : topGame.recentMinutes > 0
+        ? `${formatPlaytime(topGame.recentMinutes)} past two weeks`
+        : undefined)
   const lastPlayedGame = [...stats.games]
     .filter((g) => g.lastPlayed !== null)
     .sort(
@@ -51,11 +60,8 @@ export default async function Home() {
     { label: 'New to library & played', value: String(newToLibraryCount) },
     {
       label: 'Most played',
-      value: topGame && topGame.minutesGained > 0 ? topGame.name : '—',
-      detail:
-        topGame && topGame.minutesGained > 0
-          ? `+${formatPlaytime(topGame.minutesGained)}`
-          : undefined,
+      value: topGamePlaytime && topGame ? topGame.name : '—',
+      detail: topGamePlaytime,
     },
     {
       label: 'Last played',
@@ -82,16 +88,22 @@ export default async function Home() {
         <p className="mt-6 font-display text-4xl text-accent sm:text-5xl">
           {formatPlaytime(stats.totalMinutesGained)}
           <span className="ml-3 font-sans text-base text-muted">
-            played this year
+            tracked this year
           </span>
         </p>
+        {stats.totalRecentMinutes > 0 && (
+          <p className="mt-2 font-mono text-sm text-muted">
+            {formatPlaytime(stats.totalRecentMinutes)} in the past two weeks
+          </p>
+        )}
         <p className="mt-3 text-sm text-muted">
-          Measured against a snapshot from {formatDate(baselineDate)}.
+          Hours are measured against a snapshot from {formatDate(baselineDate)}.
           {baselineIsPartial && (
             <span className="text-foreground">
               {' '}
-              Tracking started mid-year, so earlier {year} playtime isn&apos;t
-              counted.
+              Tracking started mid-year, so earlier {year} hours aren&apos;t
+              counted — but every game you touched in {year} still shows as
+              played.
             </span>
           )}
         </p>

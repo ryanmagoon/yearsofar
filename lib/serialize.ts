@@ -10,6 +10,7 @@ export interface GameRowJson {
   firstPlayedThisYear: boolean
   newToLibrary: boolean
   playedThisYear: boolean
+  recentMinutes: number
 }
 
 export function toGameRowJson(row: GameYearRow): GameRowJson {

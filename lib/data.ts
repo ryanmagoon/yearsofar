@@ -34,7 +34,7 @@ export async function getYearSoFar(): Promise<YearSoFar> {
   }
 
   return {
-    stats: computeYearStats(baseline.games, current),
+    stats: computeYearStats(baseline.games, current, year),
     year,
     baselineDate: baseline.date,
     baselineIsPartial: baseline.date > `${year}-01-07`,

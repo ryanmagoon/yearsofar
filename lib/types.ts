@@ -6,6 +6,8 @@ export interface GameSnapshot {
   playtimeMinutes: number
   /** When the game was last launched, if Steam reports it. */
   lastPlayed: Date | null
+  /** Minutes played in the last two weeks (live Steam data only; not stored in snapshots). */
+  recentMinutes?: number
 }
 
 /** Per-game year-to-date stats derived from comparing a baseline snapshot to current data. */
@@ -20,13 +22,19 @@ export interface GameYearRow {
   firstPlayedThisYear: boolean
   /** True if the game wasn't in the library at the baseline snapshot. */
   newToLibrary: boolean
-  /** True if any playtime was gained since the baseline. */
+  /**
+   * True if any playtime was gained since the baseline, or Steam's last-played
+   * timestamp falls within the year (covers play before tracking started).
+   */
   playedThisYear: boolean
+  /** Minutes played in the last two weeks, live from Steam. */
+  recentMinutes: number
 }
 
 export interface YearStats {
   games: GameYearRow[]
   totalMinutesGained: number
+  totalRecentMinutes: number
   gamesPlayedCount: number
   firstPlayedCount: number
 }

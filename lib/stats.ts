@@ -20,6 +20,9 @@ function dedupeByAppid(games: GameSnapshot[]): Map<number, GameSnapshot> {
  * near Jan 1) against the current library state.
  *
  * - Deltas are clamped to >= 0 (Steam totals can shrink, e.g. family sharing).
+ * - "Played this year" is true when playtime grew since the baseline OR
+ *   Steam's last-played timestamp falls within the year — the latter covers
+ *   games played before tracking started, where the hour count is unknown.
  * - Games missing from the baseline are treated as new to the library and
  *   their full playtime counts as gained this year.
  * - Games present in the baseline but missing from the current snapshot
@@ -28,6 +31,7 @@ function dedupeByAppid(games: GameSnapshot[]): Map<number, GameSnapshot> {
 export function computeYearStats(
   baseline: GameSnapshot[],
   current: GameSnapshot[],
+  year: number,
 ): YearStats {
   const baselineByAppid = dedupeByAppid(baseline)
   const currentByAppid = dedupeByAppid(current)
@@ -38,6 +42,7 @@ export function computeYearStats(
     const newToLibrary = baselineGame === undefined
     const baselineMinutes = baselineGame?.playtimeMinutes ?? 0
     const minutesGained = Math.max(0, game.playtimeMinutes - baselineMinutes)
+    const lastPlayedThisYear = game.lastPlayed?.getUTCFullYear() === year
 
     games.push({
       appid: game.appid,
@@ -47,13 +52,15 @@ export function computeYearStats(
       lastPlayed: game.lastPlayed,
       newToLibrary,
       firstPlayedThisYear: baselineMinutes === 0 && game.playtimeMinutes > 0,
-      playedThisYear: minutesGained > 0,
+      playedThisYear: minutesGained > 0 || lastPlayedThisYear,
+      recentMinutes: game.recentMinutes ?? 0,
     })
   }
 
   return {
     games,
     totalMinutesGained: games.reduce((sum, g) => sum + g.minutesGained, 0),
+    totalRecentMinutes: games.reduce((sum, g) => sum + g.recentMinutes, 0),
     gamesPlayedCount: games.filter((g) => g.playedThisYear).length,
     firstPlayedCount: games.filter((g) => g.firstPlayedThisYear).length,
   }

@@ -5,6 +5,8 @@ interface SteamOwnedGame {
   appid: number
   name?: string
   playtime_forever: number
+  /** Minutes played in the last two weeks; omitted by Steam when zero. */
+  playtime_2weeks?: number
   /** Unix seconds; 0 or missing means Steam has no last-played record. */
   rtime_last_played?: number
 }
@@ -26,6 +28,7 @@ export function mapOwnedGame(game: SteamOwnedGame): GameSnapshot {
       game.rtime_last_played && game.rtime_last_played > 0
         ? new Date(game.rtime_last_played * 1000)
         : null,
+    recentMinutes: game.playtime_2weeks ?? 0,
   }
 }
 

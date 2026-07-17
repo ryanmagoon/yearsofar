@@ -29,7 +29,13 @@ function sortGames(games: GameRowJson[], sort: SortKey): GameRowJson[] {
   const sorted = [...games]
   switch (sort) {
     case 'gained':
-      return sorted.sort((a, b) => b.minutesGained - a.minutesGained)
+      // Two-week playtime and recency break ties while deltas are still zero.
+      return sorted.sort(
+        (a, b) =>
+          b.minutesGained - a.minutesGained ||
+          b.recentMinutes - a.recentMinutes ||
+          (b.lastPlayed ?? '').localeCompare(a.lastPlayed ?? ''),
+      )
     case 'total':
       return sorted.sort((a, b) => b.totalMinutes - a.totalMinutes)
     case 'name':
@@ -124,6 +130,11 @@ export function GamesTable({ games }: { games: GameRowJson[] }) {
                     <span>Last played {formatDate(game.lastPlayed)}</span>
                   ) : (
                     <span className="text-faint">No last-played record</span>
+                  )}
+                  {game.recentMinutes > 0 && (
+                    <span>
+                      · {formatPlaytime(game.recentMinutes)} past two weeks
+                    </span>
                   )}
                   {game.firstPlayedThisYear && (
                     <span className="rounded-full bg-accent-soft px-2 py-px text-accent">
