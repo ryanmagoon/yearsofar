@@ -32,7 +32,8 @@ export default async function Home() {
     return <SetupNotice message={message} />
   }
 
-  const { stats, year, baselineDate, baselineIsPartial } = data
+  const { stats, year, baselineDate, baselineIsPartial, hasAcquiredDates } =
+    data
   const rows = stats.games.map(toGameRowJson)
   const topGame = [...stats.games].sort(
     (a, b) => b.minutesThisYearFloor - a.minutesThisYearFloor,
@@ -60,7 +61,11 @@ export default async function Home() {
     { label: 'Games played', value: String(stats.gamesPlayedCount) },
     { label: 'First played this year', value: String(stats.firstPlayedCount) },
     {
-      label: `New since ${formatDate(baselineDate)}`,
+      // With license dates loaded, "new" means acquired this calendar year;
+      // otherwise it can only mean "appeared after the baseline snapshot".
+      label: hasAcquiredDates
+        ? `New to library in ${year}`
+        : `New since ${formatDate(baselineDate)}`,
       value: String(newToLibraryCount),
     },
     {
