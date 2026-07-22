@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
+    // Worktrees created by background agent sessions contain their own builds.
+    '.claude/worktrees/**',
   ]),
 ])
 

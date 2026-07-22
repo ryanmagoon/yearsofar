@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Private session artifacts
+github-curation-log.md
+
+# Claude worktrees
+.claude/worktrees/
