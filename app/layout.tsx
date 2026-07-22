@@ -14,8 +14,12 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://yearsofar.vercel.app'),
   title: 'Steam Year So Far',
-  description: 'A live look at what I have played on Steam this year.',
+  description: 'Steam Replay only covers last year. This shows the current one.',
+  twitter: {
+    card: 'summary_large_image',
+  },
 }
 
 const themeInitScript = `
