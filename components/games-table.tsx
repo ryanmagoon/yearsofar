@@ -42,7 +42,7 @@ function sortGames(games: GameRowJson[], sort: SortKey): GameRowJson[] {
 }
 
 export function GamesTable({ games }: { games: GameRowJson[] }) {
-  const [sort, setSort] = useState<SortKey>('gained')
+  const [sort, setSort] = useState<SortKey>('recent')
   const [filter, setFilter] = useState<Filter>('played')
   const [search, setSearch] = useState('')
 
